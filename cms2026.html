@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-color="blue">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#F8F9FA">
+    <title>CMS-2026 Secure Terminal</title>
+    <style>
+        /* --- 低饱和度 MD3 变量定义 --- */
+        :root {
+            --md-bg: #F8F9FA;
+            --md-surface: #FFFFFF;
+            --md-input-bg: #F1F3F5;
+            --md-text-main: #212529;
+            --md-text-sub: #6C757D;
+            --md-outline: #ADB5BD;
+            --md-outline-variant: #DEE2E6;
+            --md-shadow: 0 2px 8px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+            --md-danger: #C92A2A;
+            --md-danger-container: #FFE3E3;
+            --md-on-danger-container: #A61E1E;
+            
+            /* 莫奈灰蓝 (Blue - 默认) */
+            --md-primary: #5A6B8A;
+            --md-primary-container: #D8E2F0;
+            --md-on-primary: #FFFFFF;
+            --md-on-primary-container: #1E2B3F;
+            --md-secondary: #4A6B7A;
+            --md-secondary-container: #C8E0E8;
+            --md-on-secondary-container: #0F2A33;
+        }
+
+        /* 莫奈灰绿 (Green) */
+        [data-color="green"] {
+            --md-bg: #F6F8F7;
+            --md-surface: #FFFFFF;
+            --md-input-bg: #E9F0ED;
+            --md-primary: #4D7C5F;
+            --md-primary-container: #D1E7DD;
+            --md-on-primary: #FFFFFF;
+            --md-on-primary-container: #143D26;
+            --md-secondary: #3A6B5A;
+            --md-secondary-container: #C2E0D5;
+            --md-on-secondary-container: #0A2E22;
+        }
+
+        /* 莫奈中性灰 (Gray) */
+        [data-color="gray"] {
+            --md-bg: #F7F7F8;
+            --md-surface: #FFFFFF;
+            --md-input-bg: #EEEEF0;
+            --md-primary: #6B7280;
+            --md-primary-container: #E5E7EB;
+            --md-on-primary: #FFFFFF;
+            --md-on-primary-container: #1F2937;
+            --md-secondary: #5C6370;
+            --md-secondary-container: #E2E4E8;
+            --md-on-secondary-container: #1A202C;
+        }
+
+        /* --- 深色模式适配 (低饱和度) --- */
+        [data-theme="dark"] {
+            --md-bg: #121418;
+            --md-surface: #1A1D24;
+            --md-input-bg: #232730;
+            --md-text-main: #E6E8EB;
+            --md-text-sub: #9CA3AF;
+            --md-outline: #6B7280;
+            --md-outline-variant: #374151;
+            --md-shadow: 0 4px 12px rgba(0,0,0,0.35);
+            --md-danger: #F87171;
+            --md-danger-container: #7F1D1D;
+            --md-on-danger-container: #FECACA;
+        }
+        
+        [data-theme="dark"][data-color="blue"] {
+            --md-primary: #8BA3C7;
+            --md-primary-container: #2A3A4F;
+            --md-on-primary: #111827;
+            --md-on-primary-container: #D8E2F0;
+            --md-secondary: #7FB3C5;
+            --md-secondary-container: #1E3A45;
+            --md-on-secondary-container: #C8E0E8;
+        }
+        
+        [data-theme="dark"][data-color="green"] {
+            --md-primary: #7FB89A;
+            --md-primary-container: #1C3A2A;
+            --md-on-primary: #0F2418;
+            --md-on-primary-container: #D1E7DD;
+            --md-secondary: #6FA895;
+            --md-secondary-container: #183328;
+            --md-on-secondary-container: #C2E0D5;
+        }
+
+        [data-theme="dark"][data-color="gray"] {
+            --md-primary: #9CA3AF;
+            --md-primary-container: #374151;
+            --md-on-primary: #111827;
+            --md-on-primary-container: #E5E7EB;
+            --md-secondary: #8B93A0;
+            --md-secondary-container: #333A45;
+            --md-on-secondary-container: #E2E4E8;
+        }
+
+        /* --- 基础重置与兼容 --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; -webkit-tap-highlight-color: transparent; }
+        html, body { height: 100%; overscroll-behavior: none; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--md-bg);
+            color: var(--md-text-main);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background-color 0.25s ease, color 0.25s ease;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* --- 布局容器 --- */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .view-container {
+            width: 100%;
+            max-width: 680px;
+            display: none;
+            flex-direction: column;
+            gap: 18px;
+            animation: fadeIn 0.25s ease;
+        }
+        .view-container.active { display: flex; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 卡片样式 */
+        .card {
+            background: var(--md-surface);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: var(--md-shadow);
+            transition: background-color 0.25s ease;
+        }
+
+        /* --- 标题与排版 --- */
+        .header-box { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        h1 { font-size: 1.5rem; font-weight: 700; color: var(--md-primary); margin: 0; letter-spacing: -0.02em; }
+        .badge { background: var(--md-primary-container); color: var(--md-on-primary-container); padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 600; margin-left: 10px; }
+        p.desc { font-size: 0.85rem; color: var(--md-text-sub); margin-top: 4px; font-weight: 500; }
+        h2.section-title { font-size: 1.05rem; color: var(--md-primary); margin-bottom: 12px; font-weight: 600; }
+
+        /* --- 表单与输入优化 --- */
+        label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: var(--md-text-main); }
+        
+        textarea, input[type="password"] {
+            width: 100%; padding: 14px;
+            border: 1.5px solid var(--md-outline-variant);
+            border-radius: 12px;
+            background: var(--md-input-bg);
+            color: var(--md-text-main);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 16px !important; /* 防止 iOS 聚焦放大 */
+            line-height: 1.6; resize: vertical;
+            caret-color: var(--md-primary);
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+            -webkit-appearance: none; appearance: none;
+        }
+        textarea { min-height: 110px; }
+        textarea:focus, input[type="password"]:focus { 
+            border-color: var(--md-primary); background: var(--md-surface);
+            box-shadow: 0 0 0 3px var(--md-primary-container); 
+        }
+        textarea::placeholder, input::placeholder { color: var(--md-text-sub); opacity: 0.7; }
+
+        /* --- 按钮统一样式 --- */
+        button { font-family: inherit; touch-action: manipulation; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 4px; }
+        
+        .action-btn {
+            padding: 14px; border: none; border-radius: 12px;
+            font-size: 0.95rem; font-weight: 600; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+            min-height: 48px; /* 触控友好 */
+        }
+        /* 加密/解密按钮样式统一，不突出显示 */
+        .btn-encrypt, .btn-decrypt { 
+            background-color: var(--md-primary-container); 
+            color: var(--md-on-primary-container); 
+            border: 1px solid transparent;
+        }
+        .btn-encrypt:hover, .btn-decrypt:hover { 
+            filter: brightness(0.96); 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08); 
+        }
+        .btn-encrypt:active, .btn-decrypt:active { transform: scale(0.98); }
+        
+        .btn-text { background: transparent; color: var(--md-primary); border: none; cursor: pointer; font-size: 0.85rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; transition: 0.2s; }
+        .btn-text:hover { background: var(--md-primary-container); }
+        
+        .btn-danger { background: var(--md-danger-container); color: var(--md-on-danger-container); border: none; border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: 0.2s;}
+        .btn-danger:hover { background: var(--md-danger); color: white; }
+
+        /* --- 模式切换器 --- */
+        .mode-switch {
+            display: flex; align-items: center; justify-content: space-between;
+            background: var(--md-input-bg); padding: 14px 16px;
+            border-radius: 12px; cursor: pointer; border: 1.5px solid transparent;
+            transition: all 0.25s;
+        }
+        .mode-switch.active { background: var(--md-secondary-container); border-color: transparent; }
+        .switch-label { font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 10px; color: var(--md-text-main); transition: color 0.25s; }
+        .mode-switch.active .switch-label { color: var(--md-on-secondary-container); }
+        
+        .toggle-checkbox { 
+            appearance: none; width: 44px; height: 26px; 
+            background: var(--md-outline-variant); border-radius: 13px; position: relative; cursor: pointer; transition: 0.3s; 
+            flex-shrink: 0;
+        }
+        .toggle-checkbox::after { 
+            content: ''; position: absolute; top: 3px; left: 4px; width: 20px; height: 20px; 
+            background: white; border-radius: 50%; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle-checkbox:checked { background: var(--md-secondary); }
+        .toggle-checkbox:checked::after { left: 20px; }
+
+        #secure-key-container { max-height: 0; overflow: hidden; opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #secure-key-container.show { max-height: 120px; opacity: 1; margin-top: 16px; }
+
+        /* --- 分段选择器 --- */
+        .segment-group { display: flex; background: var(--md-input-bg); border-radius: 12px; overflow: hidden; margin-bottom: 16px; border: 1px solid var(--md-outline-variant); }
+        .segment-btn { flex: 1; padding: 10px 4px; border: none; background: transparent; color: var(--md-text-main); font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; border-right: 1px solid var(--md-outline-variant); }
+        .segment-btn:last-child { border-right: none; }
+        .segment-btn:hover { background: rgba(0,0,0,0.04); }
+        .segment-btn.active { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+
+        /* --- 历史记录列表 --- */
+        .history-list { display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; padding-right: 4px; }
+        .history-list::-webkit-scrollbar { width: 6px; }
+        .history-list::-webkit-scrollbar-thumb { background: var(--md-outline-variant); border-radius: 3px; }
+        .history-card { background: var(--md-input-bg); border-radius: 12px; padding: 16px; position: relative; border: 1px solid var(--md-outline-variant); }
+        .history-time { font-size: 0.75rem; color: var(--md-text-sub); margin-bottom: 8px; font-family: monospace; }
+        .history-card p { margin: 4px 0; font-size: 0.85rem; word-break: break-all; color: var(--md-text-main); }
+        .history-card p strong { color: var(--md-primary); }
+        .btn-del-item { position: absolute; top: 12px; right: 12px; background: transparent; color: var(--md-danger); border: none; font-size: 0.8rem; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: 0.2s;}
+        .btn-del-item:hover { background: var(--md-danger-container); }
+        .empty-hint { text-align: center; color: var(--md-text-sub); font-size: 0.9rem; padding: 24px 0; }
+
+        /* --- 关于与版权 --- */
+        .about-links { margin-top: 12px; }
+        .about-item { margin-bottom: 8px; }
+        .about-label { display: block; font-size: 0.75rem; color: var(--md-text-sub); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .about-link { color: var(--md-primary); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+        .about-link:hover { text-decoration: underline; }
+        footer { margin-top: 20px; text-align: center; color: var(--md-outline); font-size: 0.75rem; line-height: 1.6; padding-bottom: 10px; }
+
+        /* --- 底部导航栏 --- */
+        .bottom-nav {
+            height: 64px; background: var(--md-surface); box-shadow: 0 -2px 10px rgba(0,0,0,0.04);
+            display: flex; justify-content: space-around; align-items: center; padding: 0 10px; z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .nav-tab {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            background: transparent; border: none; color: var(--md-text-sub); cursor: pointer; transition: 0.2s;
+            height: 100%; border-radius: 12px; margin: 4px; gap: 4px;
+        }
+        .nav-tab.active { color: var(--md-primary); font-weight: 700; }
+        .nav-tab:hover { background: var(--md-input-bg); }
+        .nav-icon { font-size: 1.2rem; }
+        .nav-tab.active .nav-icon { background: var(--md-primary-container); padding: 4px 16px; border-radius: 12px; color: var(--md-on-primary-container); }
+
+        @media (max-width: 600px) {
+            .main-content { padding: 16px; }
+            .card { padding: 16px; border-radius: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-content">
+        
+        <div id="view-home" class="view-container active">
+            <div class="card header-box" style="flex-direction: column; align-items: flex-start; padding: 24px 20px;">
+                <div style="display: flex; align-items: center; width: 100%;">
+                    <h1>CMS-2026 <span class="badge">PRO</span></h1>
+                </div>
+                <p class="desc" data-i18n="subtitle">本地安全加解密工具</p>
+            </div>
+
+            <div class="card">
+                <label for="inputData" data-i18n="inputLabel">源数据 / 密文</label>
+                <textarea id="inputData" placeholder="..." autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+                
+                <div style="margin-top: 20px;"></div>
+
+                <div class="mode-switch" id="modeSwitchBox">
+                    <div class="switch-label">
+                        <span id="modeLabelIcon">⚡</span>
+                        <span id="modeLabelText" data-i18n="modeStandard">标准模式</span>
+                    </div>
+                    <input type="checkbox" id="isStrongMode" class="toggle-checkbox">
+                </div>
+
+                <div id="secure-key-container">
+                    <label for="customKey" data-i18n="keyLabel">自定义密钥</label>
+                    <input type="password" id="customKey" placeholder="" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="action-btn btn-encrypt" onclick="processData('encrypt')">
+                    <span>🔒</span> <span data-i18n="btnEncrypt">加密</span>
+                </button>
+                <button class="action-btn btn-decrypt" onclick="processData('decrypt')">
+                    <span>🔓</span> <span data-i18n="btnDecrypt">解密</span>
+                </button>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                    <label for="outputData" data-i18n="outputLabel" style="margin-bottom: 0;">处理结果</label>
+                    <button class="btn-text" onclick="copyResult()" data-i18n="btnCopy">复制</button>
+                </div>
+                <textarea id="outputData" readonly placeholder="" autocomplete="off"></textarea>
+            </div>
+        </div>
+
+        <div id="view-settings" class="view-container">
+            
+            <div class="card">
+                <h2 class="section-title" data-i18n="appearanceTitle">外观与语言</h2>
+                
+                <label data-i18n="themeTitle">深浅色模式</label>
+                <div class="segment-group" id="theme-group">
+                    <button class="segment-btn" onclick="setTheme('light')" data-val="light" data-i18n="themeLight">浅色</button>
+                    <button class="segment-btn" onclick="setTheme('dark')" data-val="dark" data-i18n="themeDark">深色</button>
+                </div>
+
+                <label data-i18n="colorTitle">莫奈取色</label>
+                <div class="segment-group" id="color-group">
+                    <button class="segment-btn" onclick="setColor('blue')" data-val="blue" data-i18n="colorBlue">浅蓝</button>
+                    <button class="segment-btn" onclick="setColor('green')" data-val="green" data-i18n="colorGreen">浅绿</button>
+                    <button class="segment-btn" onclick="setColor('gray')" data-val="gray" data-i18n="colorGray">白灰</button>
+                </div>
+
+                <label data-i18n="langTitle">语言设置 / Language</label>
+                <div class="segment-group" id="lang-group">
+                    <button class="segment-btn" onclick="setLang('zh')" data-val="zh">中文</button>
+                    <button class="segment-btn" onclick="setLang('en')" data-val="en">English</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 class="section-title" data-i18n="dataTitle">数据与备份</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button class="action-btn" style="flex:1; background: var(--md-input-bg); color: var(--md-text-main); font-size: 0.9rem;" onclick="exportData()">
+                        📦 <span data-i18n="btnExport">导出配置/历史</span>
+                    </button>
+                    <button class="action-btn" style="flex:1; background: var(--md-input-bg); color: var(--md-text-main); font-size: 0.9rem;" onclick="document.getElementById('importFile').click()">
+                        📥 <span data-i18n="btnImport">导入配置/历史</span>
+                    </button>
+                    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+                    <h2 class="section-title" style="margin:0;" data-i18n="historyTitle">历史记录</h2>
+                    <button class="btn-danger" onclick="clearHistory()" data-i18n="btnClearHistory">清空所有</button>
+                </div>
+                <div class="history-list" id="historyBox"></div>
+            </div>
+
+            <div class="card">
+                <h2 class="section-title" data-i18n="aboutTitle">关于 CMS-2026</h2>
+                <p style="color: var(--md-text-sub); font-size: 0.85rem;" data-i18n="modalDesc">
+                    基于 Web Crypto API (AES-GCM) 的高强度本地加密解决方案。
+                </p>
+                <div class="about-links">
+                    <div class="about-item">
+                        <span class="about-label" data-i18n="algoAddr">算法地址</span>
+                        <a href="https://github.com/clcwpwqi/CMS-2026" target="_blank" class="about-link">github.com/clcwpwqi/CMS-2026</a>
+                    </div>
+                    <div class="about-item">
+                        <span class="about-label" data-i18n="webAddr">网站地址</span>
+                        <a href="https://github.com/clcwpwqi/CMS-2026-WEB" target="_blank" class="about-link">github.com/clcwpwqi/CMS-2026-WEB</a>
+                    </div>
+                </div>
+            </div>
+
+            <footer>
+                <p>Copyright &copy; @clcwpwqi</p>
+                <p>Icon Design &copy; @MiaoSL</p>
+            </footer>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <button class="nav-tab active" onclick="switchTab('home')" id="tab-home">
+            <span class="nav-icon">🛡️</span>
+            <span style="font-size: 0.75rem;" data-i18n="navHome">加解密</span>
+        </button>
+        <button class="nav-tab" onclick="switchTab('settings')" id="tab-settings">
+            <span class="nav-icon">⚙️</span>
+            <span style="font-size: 0.75rem;" data-i18n="navSettings">设置</span>
+        </button>
+    </nav>
+
+    <script>
+        // --- 核心算法类 CMS-2026 ---
+        class CMS2026 {
+            constructor() {
+                this.algo = { name: 'AES-GCM', length: 256 };
+                this.pbkdf2 = { name: 'PBKDF2', hash: 'SHA-256', iterations: 100000 };
+                this.defaultKey = "CMS-2026-DEFAULT-STATIC-KEY-V1";
+            }
+            async encrypt(plaintext, password) {
+                const effectivePwd = password || this.defaultKey;
+                try {
+                    const encoder = new TextEncoder();
+                    const salt = crypto.getRandomValues(new Uint8Array(16));
+                    const iv = crypto.getRandomValues(new Uint8Array(12));
+                    const key = await this._deriveKey(effectivePwd, salt);
+                    const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, encoder.encode(plaintext));
+                    const buffer = new Uint8Array(salt.byteLength + iv.byteLength + encrypted.byteLength);
+                    buffer.set(salt, 0); buffer.set(iv, salt.byteLength); buffer.set(new Uint8Array(encrypted), salt.byteLength + iv.byteLength);
+                    return this._arrayBufferToBase64(buffer);
+                } catch (e) { throw new Error("ENCRYPT_FAIL"); }
+            }
+            async decrypt(encryptedBase64, password) {
+                const effectivePwd = password || this.defaultKey;
+                try {
+                    const buffer = this._base64ToArrayBuffer(encryptedBase64);
+                    if (buffer.byteLength < 28) throw new Error("INVALID_FORMAT");
+                    const salt = buffer.slice(0, 16);
+                    const iv = buffer.slice(16, 28);
+                    const data = buffer.slice(28);
+                    const key = await this._deriveKey(effectivePwd, salt);
+                    const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
+                    return new TextDecoder().decode(decrypted);
+                } catch (e) { throw new Error("DECRYPT_FAIL"); }
+            }
+            async _deriveKey(password, salt) {
+                const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), { name: 'PBKDF2' }, false, ['deriveKey']);
+                return crypto.subtle.deriveKey({ ...this.pbkdf2, salt: salt }, keyMaterial, this.algo, false, ['encrypt', 'decrypt']);
+            }
+            _arrayBufferToBase64(buffer) {
+                let binary = ''; const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                return window.btoa(binary);
+            }
+            _base64ToArrayBuffer(base64) {
+                try {
+                    const binary_string = window.atob(base64); const len = binary_string.length; const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) bytes[i] = binary_string.charCodeAt(i);
+                    return bytes.buffer;
+                } catch (e) { throw new Error("INVALID_BASE64"); }
+            }
+        }
+
+        // --- 状态与多语言 ---
+        let appState = {
+            lang: 'zh',
+            themeMode: 'light', // 默认浅色，移除 system
+            colorTheme: 'blue',
+            history: []
+        };
+
+        const translations = {
+            zh: {
+                navHome: "加解密", navSettings: "设置",
+                subtitle: "本地安全加解密工具", inputLabel: "源数据 / 密文", inputPlace: "请输入需要处理的内容...",
+                modeStandard: "标准模式", modeStrong: "强加密模式 (需密钥)", keyLabel: "自定义密钥", keyPlace: "输入您的私有密钥",
+                btnEncrypt: "加密", btnDecrypt: "解密", outputLabel: "处理结果", btnCopy: "复制", outPlace: "结果将显示在这里...",
+                copied: "已复制!", errEmpty: "请输入内容", errKey: "强加密模式必须设置密钥", errGen: "处理出错: ",
+                appearanceTitle: "外观与语言", themeTitle: "深浅色模式", themeLight: "浅色", themeDark: "深色",
+                colorTitle: "莫奈取色", colorBlue: "浅蓝", colorGreen: "浅绿", colorGray: "白灰", langTitle: "语言设置 / Language",
+                dataTitle: "数据与备份", btnExport: "导出配置/历史", btnImport: "导入配置/历史",
+                historyTitle: "历史记录", btnClearHistory: "清空所有", historyEmpty: "暂无历史记录",
+                histOrig: "原文", histTrans: "译文", histMode: "模式", histKey: "密钥", histStrong: "强加密", histStandard: "标准", btnDel: "删除",
+                aboutTitle: "关于 CMS-2026", modalDesc: "基于 Web Crypto API (AES-GCM) 的高强度本地加密解决方案。",
+                algoAddr: "算法地址", webAddr: "网站地址", importSucc: "导入成功", importFail: "导入失败或文件损坏",
+                errSecure: "当前环境不支持加密 API，请使用 HTTPS 或 localhost 访问。"
+            },
+            en: {
+                navHome: "Crypto", navSettings: "Settings",
+                subtitle: "Secure Local Crypto Tool", inputLabel: "Source / Ciphertext", inputPlace: "Enter content...",
+                modeStandard: "Standard Mode", modeStrong: "Strong Mode", keyLabel: "Custom Key", keyPlace: "Enter private key",
+                btnEncrypt: "Encrypt", btnDecrypt: "Decrypt", outputLabel: "Result", btnCopy: "Copy", outPlace: "Result will appear here...",
+                copied: "Copied!", errEmpty: "Please enter content", errKey: "Key required for Strong Mode", errGen: "Error: ",
+                appearanceTitle: "Appearance & Lang", themeTitle: "Theme Mode", themeLight: "Light", themeDark: "Dark",
+                colorTitle: "Monet Colors", colorBlue: "Blue", colorGreen: "Green", colorGray: "Gray", langTitle: "Language",
+                dataTitle: "Data & Backup", btnExport: "Export Data", btnImport: "Import Data",
+                historyTitle: "History", btnClearHistory: "Clear All", historyEmpty: "No history yet",
+                histOrig: "Orig", histTrans: "Result", histMode: "Mode", histKey: "Key", histStrong: "Strong", histStandard: "Standard", btnDel: "Delete",
+                aboutTitle: "About CMS-2026", modalDesc: "High-strength local encryption based on Web Crypto API.",
+                algoAddr: "Algorithm Repo", webAddr: "Website Repo", importSucc: "Import Successful", importFail: "Import Failed",
+                errSecure: "Crypto API unavailable. Please use HTTPS or localhost."
+            }
+        };
+
+        const cms = new CMS2026();
+
+        // --- 初始化与状态管理 ---
+        function loadState() {
+            const saved = localStorage.getItem('cms2026_state');
+            if(saved) {
+                try { Object.assign(appState, JSON.parse(saved)); } catch(e) {}
+            }
+            applyState();
+        }
+
+        function saveState() {
+            localStorage.setItem('cms2026_state', JSON.stringify(appState));
+        }
+
+        function applyState() {
+            updateLangUI();
+            applyThemeColor();
+            renderHistory();
+            updateSegmentUI('theme-group', appState.themeMode);
+            updateSegmentUI('color-group', appState.colorTheme);
+            updateSegmentUI('lang-group', appState.lang);
+        }
+
+        // --- UI 操作逻辑 ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(`view-${tabId}`).classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+        }
+
+        function setLang(lang) {
+            appState.lang = lang; saveState(); updateLangUI(); updateSegmentUI('lang-group', lang); renderHistory();
+        }
+
+        function setTheme(mode) {
+            appState.themeMode = mode; saveState(); applyThemeColor(); updateSegmentUI('theme-group', mode);
+        }
+
+        function setColor(color) {
+            appState.colorTheme = color; saveState(); applyThemeColor(); updateSegmentUI('color-group', color);
+        }
+
+        function updateSegmentUI(groupId, val) {
+            document.querySelectorAll(`#${groupId} .segment-btn`).forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-val') === val);
+            });
+        }
+
+        function applyThemeColor() {
+            document.documentElement.setAttribute('data-theme', appState.themeMode);
+            document.documentElement.setAttribute('data-color', appState.colorTheme);
+            const metaTheme = document.querySelector('meta[name="theme-color"]');
+            if(metaTheme) metaTheme.content = appState.themeMode === 'dark' ? '#121418' : '#F8F9FA';
+        }
+
+        function updateLangUI() {
+            const t = translations[appState.lang];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(t[key]) el.textContent = t[key];
+            });
+            document.getElementById('inputData').placeholder = t.inputPlace;
+            document.getElementById('outputData').placeholder = t.outPlace;
+            document.getElementById('customKey').placeholder = t.keyPlace;
+            updateModeUI();
+        }
+
+        // 模式切换 (标准/强加密)
+        const checkEl = document.getElementById('isStrongMode');
+        const keyContainer = document.getElementById('secure-key-container');
+        const modeBox = document.getElementById('modeSwitchBox');
+
+        // 优化点击区域响应
+        modeBox.addEventListener('click', (e) => {
+            if (e.target !== checkEl) {
+                checkEl.checked = !checkEl.checked;
+                updateModeUI();
+            }
+        });
+
+        function updateModeUI() {
+            const t = translations[appState.lang];
+            if (checkEl.checked) {
+                keyContainer.classList.add('show'); modeBox.classList.add('active');
+                document.getElementById('modeLabelIcon').textContent = '🛡️';
+                document.getElementById('modeLabelText').textContent = t.modeStrong;
+            } else {
+                keyContainer.classList.remove('show'); modeBox.classList.remove('active');
+                document.getElementById('modeLabelIcon').textContent = '⚡';
+                document.getElementById('modeLabelText').textContent = t.modeStandard;
+            }
+        }
+
+        // --- 加解密与历史记录 ---
+        async function processData(action) {
+            const t = translations[appState.lang];
+            const text = document.getElementById('inputData').value.trim();
+            const outputEl = document.getElementById('outputData');
+
+            if (!text) { alert(t.errEmpty); return; }
+            let password = "";
+            if (checkEl.checked) {
+                password = document.getElementById('customKey').value;
+                if (!password) { alert(t.errKey); return; }
+            }
+
+            outputEl.value = "Processing...";
+            try {
+                let result;
+                if (action === 'encrypt') result = await cms.encrypt(text, password);
+                else result = await cms.decrypt(text, password);
+                outputEl.value = result;
+
+                const timeStr = new Date().toLocaleString();
+                appState.history.unshift({
+                    id: Date.now().toString(), time: timeStr, action: action,
+                    original: text, result: result,
+                    mode: checkEl.checked ? 'strong' : 'standard',
+                    key: checkEl.checked ? password : ''
+                });
+                if(appState.history.length > 50) appState.history.pop();
+                saveState(); renderHistory();
+                
+            } catch (err) {
+                outputEl.value = "❌ " + t.errGen + err.message;
+            }
+        }
+
+        async function copyResult() {
+            const t = translations[appState.lang];
+            const outputEl = document.getElementById('outputData');
+            const btn = document.querySelector('.btn-text');
+            if(!outputEl.value || outputEl.value.startsWith("❌")) return;
+            
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(outputEl.value);
+                } else {
+                    outputEl.select();
+                    document.execCommand('copy');
+                }
+                const originalText = btn.innerText;
+                btn.innerText = t.copied;
+                setTimeout(() => btn.innerText = originalText, 1500);
+            } catch (err) {
+                console.warn('Copy failed', err);
+            }
+        }
+
+        function renderHistory() {
+            const box = document.getElementById('historyBox');
+            const t = translations[appState.lang];
+            box.innerHTML = '';
+            
+            if(appState.history.length === 0) {
+                box.innerHTML = `<div class="empty-hint">${t.historyEmpty}</div>`;
+                return;
+            }
+
+            appState.history.forEach(item => {
+                const modeText = item.mode === 'strong' ? t.histStrong : t.histStandard;
+                const actIcon = item.action === 'encrypt' ? '🔒' : '🔓';
+                const keyHtml = item.mode === 'strong' ? `<p><strong>${t.histKey}:</strong> ${item.key}</p>` : '';
+                
+                // 获取加密/解密的文字描述
+                const actionText = item.action === 'encrypt' ? t.btnEncrypt : t.btnDecrypt;
+                
+                const card = document.createElement('div');
+                card.className = 'history-card';
+                card.innerHTML = `
+                    <div class="history-time">${actIcon} ${item.time}</div>
+                    <button class="btn-del-item" onclick="delHistory('${item.id}')">${t.btnDel}</button>
+                    <p><strong>${t.histOrig}:</strong> ${item.original}</p>
+                    <p><strong>${t.histTrans}:</strong> ${item.result}</p>
+                    <p><strong>${t.histMode}:</strong> ${modeText} (${actionText})</p>
+                    ${keyHtml}
+                `;
+                box.appendChild(card);
+            });
+        }
+
+        function delHistory(id) {
+            appState.history = appState.history.filter(h => h.id !== id);
+            saveState(); renderHistory();
+        }
+
+        function clearHistory() {
+            appState.history = []; saveState(); renderHistory();
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState));
+            const dl = document.createElement('a');
+            dl.setAttribute("href", dataStr);
+            dl.setAttribute("download", `cms2026_backup_${new Date().getTime()}.json`);
+            document.body.appendChild(dl);
+            dl.click();
+            dl.remove();
+        }
+
+        function importData(e) {
+            const file = e.target.files[0];
+            const t = translations[appState.lang];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if(imported && imported.history !== undefined) {
+                        appState = Object.assign(appState, imported);
+                        saveState(); applyState();
+                        alert(translations[appState.lang].importSucc);
+                    } else throw new Error();
+                } catch (err) {
+                    alert(t.importFail);
+                }
+            };
+            reader.readAsText(file);
+            e.target.value = ''; 
+        }
+
+        // 启动加载与环境检测
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!window.crypto || !window.crypto.subtle) {
+                alert(translations[appState.lang].errSecure);
+            }
+            loadState();
+            checkEl.addEventListener('change', updateModeUI);
+        });
+    </script>
+</body>
+</html>
